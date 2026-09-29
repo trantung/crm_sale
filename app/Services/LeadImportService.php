@@ -54,7 +54,7 @@ class LeadImportService
             $rows[] = [
                 'stt' => ($mapped['stt'] ?? '') !== '' ? $mapped['stt'] : $index,
                 'name' => $name,
-                'phone' => $mapped['phone'] ?? $mapped['sdt'] ?? '',
+                'phone' => $this->padPhone($mapped['phone'] ?? $mapped['sdt'] ?? ''),
                 'email' => $mapped['email'] ?? '',
                 'utm' => $mapped['utm'] ?? $mapped['utm_campaign'] ?? '',
             ];
@@ -104,7 +104,7 @@ class LeadImportService
                 continue;
             }
             $rows[$i]['name'] = trim((string) ($row['name'] ?? $rows[$i]['name']));
-            $rows[$i]['phone'] = trim((string) ($row['phone'] ?? $rows[$i]['phone']));
+            $rows[$i]['phone'] = $this->padPhone((string) ($row['phone'] ?? $rows[$i]['phone']));
             $rows[$i]['email'] = trim((string) ($row['email'] ?? $rows[$i]['email']));
             $rows[$i]['utm'] = trim((string) ($row['utm'] ?? $rows[$i]['utm']));
         }
@@ -127,6 +127,16 @@ class LeadImportService
     public function forgetDraft(string $token): void
     {
         Storage::disk('local')->delete($this->path($token));
+    }
+
+    public function padPhone(string $phone): string
+    {
+        $digits = preg_replace('/\D+/', '', trim($phone)) ?? '';
+        if ($digits === '' || str_starts_with($digits, '0')) {
+            return $digits;
+        }
+
+        return '0'.$digits;
     }
 
     /**

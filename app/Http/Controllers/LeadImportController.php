@@ -131,7 +131,7 @@ class LeadImportController extends Controller
             try {
                 $result = $this->leads->ingest([
                     'name' => $name,
-                    'phone' => $row['phone'] ?? '',
+                    'phone' => $this->importer->padPhone((string) ($row['phone'] ?? '')),
                     'email' => $row['email'] ?? '',
                     'allow_name_only' => true,
                     'source_code' => $utm['source_code'],
