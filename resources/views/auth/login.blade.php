@@ -1,31 +1,32 @@
-<div class="mb-6">
-    <div class="ts-brand" style="color:#0f2744;letter-spacing:0.08em;">
-        <span>CRM</span> TELESALE
-    </div>
-    <p class="mt-3 text-sm text-slate-500">Đăng nhập bằng username và mật khẩu</p>
-</div>
-
-<x-auth-session-status class="mb-4" :status="session('status')" />
-
-<form method="POST" action="{{ route('login') }}" class="space-y-4">
-    @csrf
-
-    <div>
-        <label class="ts-label" for="username">Username</label>
-        <input id="username" class="ts-input" type="text" name="username" value="{{ old('username') }}" required autofocus autocomplete="username">
-        <x-input-error :messages="$errors->get('username')" class="mt-2" />
+<x-guest-layout>
+    <div class="ts-login-head">
+        <div class="ts-login-mark">CRM</div>
+        <h1>Đăng nhập</h1>
+        <p>CRM Telesale · IELTS Checkmate</p>
     </div>
 
-    <div>
-        <label class="ts-label" for="password">Mật khẩu</label>
-        <input id="password" class="ts-input" type="password" name="password" required autocomplete="current-password">
-        <x-input-error :messages="$errors->get('password')" class="mt-2" />
-    </div>
+    <x-auth-session-status class="ts-login-status" :status="session('status')" />
 
-    <label for="remember_me" class="inline-flex items-center gap-2">
-        <input id="remember_me" type="checkbox" class="rounded border-slate-300" name="remember">
-        <span class="text-sm text-slate-600">Ghi nhớ đăng nhập</span>
-    </label>
+    <form method="POST" action="{{ route('login') }}" class="ts-login-form">
+        @csrf
 
-    <button type="submit" class="ts-btn ts-btn-primary w-full justify-center">Đăng nhập</button>
-</form>
+        <div>
+            <label class="ts-label" for="username">Username</label>
+            <input id="username" class="ts-input" type="text" name="username" value="{{ old('username') }}" required autofocus autocomplete="username" placeholder="Nhập username">
+            <x-input-error :messages="$errors->get('username')" class="mt-2" />
+        </div>
+
+        <div>
+            <label class="ts-label" for="password">Mật khẩu</label>
+            <input id="password" class="ts-input" type="password" name="password" required autocomplete="current-password" placeholder="Nhập mật khẩu">
+            <x-input-error :messages="$errors->get('password')" class="mt-2" />
+        </div>
+
+        <label for="remember_me" class="ts-login-remember">
+            <input id="remember_me" type="checkbox" name="remember">
+            <span>Ghi nhớ đăng nhập</span>
+        </label>
+
+        <button type="submit" class="ts-btn ts-btn-primary ts-login-submit">Đăng nhập</button>
+    </form>
+</x-guest-layout>

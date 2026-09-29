@@ -18,8 +18,8 @@
 <div>
     <label class="ts-label" for="role">Role</label>
     <select id="role" name="role" class="ts-select" required>
-        <option value="sale" @selected(old('role', $user->role ?? 'sale') === 'sale')">Sale</option>
-        <option value="admin" @selected(old('role', $user->role ?? '') === 'admin')">Admin</option>
+        <option value="sale" @selected(old('role', $user->role ?? 'sale') === 'sale')">Tư vấn viên</option>
+        <option value="admin" @selected(old('role', $user->role ?? '') === 'admin')">Quản lý</option>
     </select>
     <x-input-error :messages="$errors->get('role')" class="mt-2" />
 </div>

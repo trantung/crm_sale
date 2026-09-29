@@ -7,9 +7,7 @@
             <strong>{{ $lead->code ?: 'LD-'.$lead->id }}</strong>
         </div>
         <div class="ts-actions">
-            @if ($lead->telHref())
-                <a href="{{ $lead->telHref() }}" class="ts-btn ts-btn-call" onclick="document.getElementById('call-box')?.scrollIntoView({behavior:'smooth'})">📞 GỌI</a>
-            @endif
+            <a href="{{ route('orders.create', ['lead_id' => $lead->id]) }}" class="ts-btn ts-btn-primary">+ Tạo đơn</a>
             <a href="{{ route('leads.edit', $lead) }}" class="ts-btn ts-btn-ghost">Sửa</a>
             @can('delete', $lead)
                 <form method="POST" action="{{ route('leads.destroy', $lead) }}" onsubmit="return confirm('Xóa lead này?')">
@@ -41,16 +39,24 @@
                         <div class="font-semibold">{{ $lead->source?->name ?? '—' }}</div>
                     </div>
                     <div>
-                        <div class="ts-label">Stage</div>
+                        <div class="ts-label">Level</div>
                         <div class="font-semibold">{{ $lead->stage?->name }}</div>
+                        @php $latestReason = $lead->stageHistories->firstWhere('reason'); @endphp
+                        @if ($latestReason?->reason)
+                            <div class="text-xs text-slate-500 mt-1">Lý do: {{ $latestReason->reason }}</div>
+                        @endif
                     </div>
                     <div>
-                        <div class="ts-label">Sale phụ trách</div>
+                        <div class="ts-label">Tư vấn viên</div>
                         <div class="font-semibold">{{ $lead->owner?->name ?? 'Chưa phân' }}</div>
                     </div>
                     <div>
                         <div class="ts-label">Lần cuối gọi</div>
                         <div class="font-semibold">{{ $lead->lastCallLabel() }}</div>
+                    </div>
+                    <div>
+                        <div class="ts-label">Phân loại</div>
+                        <div class="font-semibold">{{ $lead->customerTypeLabel() }}</div>
                     </div>
                     <div>
                         <div class="ts-label">Sản phẩm quan tâm</div>
@@ -65,34 +71,6 @@
                         <div>{{ $lead->note ?: '—' }}</div>
                     </div>
                 </div>
-            </div>
-
-            <div class="ts-panel p-5" id="call-box">
-                <div class="ts-card-title">Ghi kết quả cuộc gọi</div>
-                <form method="POST" action="{{ route('leads.call', $lead) }}" class="grid grid-cols-1 md:grid-cols-3 gap-3">
-                    @csrf
-                    <div>
-                        <label class="ts-label">Kết quả</label>
-                        <select name="call_result" class="ts-select" x-data="{ v: '{{ old('call_result', $lead->call_result === 'not_called' ? 'no_answer' : $lead->call_result) }}' }" x-model="v" id="detail-call-result">
-                            @foreach ($callResults as $value => $label)
-                                @if ($value !== 'not_called')
-                                    <option value="{{ $value }}">{{ $label }}</option>
-                                @endif
-                            @endforeach
-                        </select>
-                    </div>
-                    <div>
-                        <label class="ts-label">Hẹn gọi lại</label>
-                        <input type="datetime-local" name="callback_at" class="ts-input" value="{{ old('callback_at', $lead->callback_at?->format('Y-m-d\TH:i')) }}">
-                    </div>
-                    <div>
-                        <label class="ts-label">Ghi chú cuộc gọi</label>
-                        <input type="text" name="content" class="ts-input" placeholder="Nội dung trao đổi...">
-                    </div>
-                    <div class="md:col-span-3 flex justify-end">
-                        <button class="ts-btn ts-btn-call" type="submit">📞 Lưu kết quả gọi</button>
-                    </div>
-                </form>
             </div>
 
             <div class="ts-panel p-5">
@@ -137,18 +115,65 @@
                 @endif
             </div>
 
+            @if ($lead->orders->isNotEmpty())
+                <div class="ts-panel p-5">
+                    <div class="ts-card-title">Đơn hàng nội bộ</div>
+                    <table class="ts-table">
+                        <thead>
+                            <tr>
+                                <th>Mã đơn</th>
+                                <th>Sản phẩm</th>
+                                <th>Tổng tiền</th>
+                                <th>Ngày</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach ($lead->orders as $order)
+                                <tr>
+                                    <td><a class="ts-code" href="{{ route('orders.show', $order) }}">{{ $order->code }}</a></td>
+                                    <td>{{ $order->productNames() }}</td>
+                                    <td class="font-semibold">{{ $order->formattedTotal() }}</td>
+                                    <td>{{ $order->created_at?->format('d/m/Y') }}</td>
+                                </tr>
+                            @endforeach
+                        </tbody>
+                    </table>
+                </div>
+            @endif
+
             <div class="ts-panel p-5">
-                <div class="ts-card-title">Hoạt động</div>
-                <form method="POST" action="{{ route('leads.activities.store', $lead) }}" class="flex flex-col md:flex-row gap-2 mb-4">
+                <div class="ts-card-title">Ghi liên hệ</div>
+                <form method="POST" action="{{ route('leads.activities.store', $lead) }}" class="grid grid-cols-1 gap-3 mb-5">
                     @csrf
-                    <select name="type" class="ts-select md:w-40">
-                        @foreach ($activityTypes as $value => $label)
-                            <option value="{{ $value }}">{{ $label }}</option>
-                        @endforeach
-                    </select>
-                    <input type="text" name="content" required class="ts-input flex-1" placeholder="Nội dung...">
-                    <button class="ts-btn ts-btn-primary" type="submit">Ghi</button>
+                    <div>
+                        <label class="ts-label">Hình thức</label>
+                        <select name="type" class="ts-select" required>
+                            @foreach ($contactTypes as $value => $label)
+                                <option value="{{ $value }}" @selected(old('type', 'call') === $value)>{{ $label }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                    <div>
+                        <label class="ts-label">Trạng thái</label>
+                        <select name="call_result" class="ts-select" required>
+                            @foreach ($callResults as $value => $label)
+                                <option value="{{ $value }}" @selected(old('call_result', $lead->call_result ?: 'not_called') === $value)>{{ $label }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                    <div>
+                        <label class="ts-label">Nội dung trao đổi</label>
+                        <textarea name="content" rows="3" class="ts-textarea" required placeholder="Nội dung trao đổi với khách...">{{ old('content') }}</textarea>
+                    </div>
+                    <div>
+                        <label class="ts-label">Hẹn liên hệ lại</label>
+                        <input type="datetime-local" name="callback_at" class="ts-input" value="{{ old('callback_at', $lead->callback_at?->format('Y-m-d\TH:i')) }}">
+                    </div>
+                    <div class="flex justify-end">
+                        <button class="ts-btn ts-btn-primary" type="submit">Lưu liên hệ</button>
+                    </div>
                 </form>
+                <div class="ts-label mb-2">Lịch sử liên hệ</div>
                 <ul class="space-y-3 text-sm">
                     @forelse ($lead->activities as $activity)
                         <li class="border-b border-slate-100 pb-2">
@@ -165,23 +190,59 @@
         </div>
 
         <div class="space-y-4">
-            <div class="ts-panel p-5">
-                <div class="ts-card-title">Chuyển stage</div>
+            <div class="ts-panel p-5" x-data="{
+                level: '{{ $lead->stage?->level_group ?: 'L0' }}',
+                detailId: '{{ $lead->stage && ! $lead->stage->isMain() ? $lead->stage_id : '' }}',
+                details: {{ \Illuminate\Support\Js::from($stageDetails) }}
+            }">
+                <div class="ts-card-title">Chuyển level</div>
                 <form method="POST" action="{{ route('leads.stage', $lead) }}" class="space-y-3">
                     @csrf
-                    <select name="stage_id" class="ts-select">
-                        @foreach ($stages as $stage)
-                            <option value="{{ $stage->id }}" @selected($lead->stage_id === $stage->id)>{{ $stage->name }}</option>
+                    <div>
+                        <label class="ts-label">Level chính</label>
+                        <select name="level_group" class="ts-select" x-model="level" @change="detailId = ''">
+                            @foreach ($levelTabs as $key => $label)
+                                <option value="{{ $key }}">{{ $label }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                    <div>
+                        <label class="ts-label">Chi tiết level</label>
+                        <select name="stage_id" class="ts-select" x-model="detailId">
+                            <option value="">— Chọn mức chi tiết —</option>
+                            @foreach ($stageDetails as $group => $items)
+                                @foreach ($items as $item)
+                                    <option value="{{ $item['id'] }}" x-show="level === '{{ $group }}'" x-cloak>{{ $item['name'] }}</option>
+                                @endforeach
+                            @endforeach
+                        </select>
+                        <p class="text-xs text-slate-400 mt-1" x-show="!(details[level] || []).length">Level này không có mức chi tiết (L0).</p>
+                    </div>
+                    <div>
+                        <label class="ts-label" for="stage-reason">Lý do (tuỳ chọn)</label>
+                        <textarea id="stage-reason" name="reason" rows="3" class="ts-textarea" placeholder="Ví dụ: khách hẹn chuyển khoản, sai đối tượng...">{{ old('reason') }}</textarea>
+                    </div>
+                    <button class="ts-btn ts-btn-primary" type="submit">Cập nhật level</button>
+                </form>
+            </div>
+
+            <div class="ts-panel p-5">
+                <div class="ts-card-title">Phân loại lead</div>
+                <form method="POST" action="{{ route('leads.classify', $lead) }}" class="space-y-3">
+                    @csrf
+                    <select name="customer_type" class="ts-select">
+                        <option value="">— Chọn phân loại —</option>
+                        @foreach ($customerTypes as $value => $label)
+                            <option value="{{ $value }}" @selected(old('customer_type', $lead->customer_type) === $value)>{{ $label }}</option>
                         @endforeach
                     </select>
-                    <input type="text" name="reason" class="ts-input" placeholder="Lý do (tuỳ chọn)">
-                    <button class="ts-btn ts-btn-primary" type="submit">Cập nhật stage</button>
+                    <button class="ts-btn ts-btn-primary" type="submit">Lưu phân loại</button>
                 </form>
             </div>
 
             @can('assign', $lead)
                 <div class="ts-panel p-5">
-                    <div class="ts-card-title">Phân sale</div>
+                    <div class="ts-card-title">Phân tư vấn viên</div>
                     <form method="POST" action="{{ route('leads.assign', $lead) }}" class="space-y-3">
                         @csrf
                         <select name="owner_id" class="ts-select">
@@ -196,14 +257,14 @@
             @endcan
 
             <div class="ts-panel p-5">
-                <div class="ts-card-title">Lịch sử stage</div>
+                <div class="ts-card-title">Lịch sử level</div>
                 <ul class="space-y-2 text-sm">
                     @foreach ($lead->stageHistories as $history)
                         <li>
                             {{ $history->fromStage?->name ?? '—' }} → <span class="font-semibold">{{ $history->toStage?->name }}</span>
                             <div class="text-xs text-slate-400">{{ $history->changer?->name ?? 'Hệ thống' }} · {{ $history->created_at?->format('d/m/Y H:i') }}</div>
                             @if ($history->reason)
-                                <div class="text-slate-500">{{ $history->reason }}</div>
+                                <div class="text-slate-700 mt-1">Lý do: {{ $history->reason }}</div>
                             @endif
                         </li>
                     @endforeach

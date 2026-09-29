@@ -22,6 +22,11 @@ class LeadPolicy
         return $user->is_active;
     }
 
+    public function import(User $user): bool
+    {
+        return $user->isAdmin();
+    }
+
     public function update(User $user, Lead $lead): bool
     {
         return $user->isAdmin() || $lead->owner_id === $user->id;
@@ -33,6 +38,11 @@ class LeadPolicy
     }
 
     public function assign(User $user, Lead $lead): bool
+    {
+        return $user->isAdmin();
+    }
+
+    public function assignAny(User $user): bool
     {
         return $user->isAdmin();
     }

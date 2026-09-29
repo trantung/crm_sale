@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Lead;
 use App\Models\LeadStage;
+use App\Models\Order;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
 
@@ -13,21 +14,21 @@ class DashboardController extends Controller
     {
         $user = $request->user();
         $base = Lead::query()->visibleTo($user);
+        $orders = Order::query()->visibleTo($user);
 
-        $funnel = LeadStage::query()
-            ->orderBy('sort_order')
-            ->get()
-            ->map(fn (LeadStage $stage) => [
-                'name' => $stage->name,
-                'count' => (clone $base)->where('stage_id', $stage->id)->count(),
-            ]);
+        $funnel = collect(LeadStage::levelTabs())->map(fn (string $name, string $level) => [
+            'level' => $level,
+            'name' => $name,
+            'count' => (clone $base)->level($level)->count(),
+        ]);
 
         return view('dashboard', [
             'totalLeads' => (clone $base)->count(),
             'unassignedCount' => $user->isAdmin() ? Lead::query()->whereNull('owner_id')->count() : 0,
-            'newCount' => (clone $base)->tab('new')->count(),
+            'l0Count' => (clone $base)->level('L0')->count(),
             'callbackCount' => (clone $base)->tab('callback')->count(),
-            'recareCount' => (clone $base)->tab('recare')->count(),
+            'orderCount' => (clone $orders)->count(),
+            'revenueTotal' => (clone $orders)->sum('total'),
             'funnel' => $funnel,
         ]);
     }

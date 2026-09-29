@@ -8,11 +8,6 @@
             <span>›</span>
             <strong>Sửa</strong>
         </div>
-        <div class="ts-actions">
-            @if ($lead->telHref())
-                <a href="{{ $lead->telHref() }}" class="ts-btn ts-btn-call">📞 GỌI</a>
-            @endif
-        </div>
     </div>
 
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">

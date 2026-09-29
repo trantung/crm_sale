@@ -4,7 +4,6 @@ namespace Database\Seeders;
 
 use App\Models\Lead;
 use App\Models\LeadSource;
-use App\Models\LeadStage;
 use App\Models\User;
 use App\Services\LeadService;
 use Illuminate\Database\Seeder;
@@ -38,7 +37,10 @@ class DatabaseSeeder extends Seeder
         );
 
         $this->seedSources();
-        $this->seedStages();
+        $this->call([
+            LeadStageSeeder::class,
+            ProductSeeder::class,
+        ]);
         $this->seedDemoLeads();
     }
 
@@ -61,25 +63,6 @@ class DatabaseSeeder extends Seeder
             LeadSource::query()->updateOrCreate(
                 ['code' => $source['code']],
                 ['name' => $source['name'], 'sort_order' => $source['sort_order'], 'is_active' => true]
-            );
-        }
-    }
-
-    private function seedStages(): void
-    {
-        $stages = [
-            ['slug' => 'new', 'name' => 'Mới', 'sort_order' => 1, 'is_default' => true, 'is_closed' => false],
-            ['slug' => 'contacted', 'name' => 'Đã liên hệ', 'sort_order' => 2, 'is_default' => false, 'is_closed' => false],
-            ['slug' => 'qualified', 'name' => 'Đủ điều kiện', 'sort_order' => 3, 'is_default' => false, 'is_closed' => false],
-            ['slug' => 'consulting', 'name' => 'Đang tư vấn', 'sort_order' => 4, 'is_default' => false, 'is_closed' => false],
-            ['slug' => 'ordered', 'name' => 'Đã tạo đơn', 'sort_order' => 5, 'is_default' => false, 'is_closed' => false],
-            ['slug' => 'lost', 'name' => 'Không chốt', 'sort_order' => 6, 'is_default' => false, 'is_closed' => true],
-        ];
-
-        foreach ($stages as $stage) {
-            LeadStage::query()->updateOrCreate(
-                ['slug' => $stage['slug']],
-                $stage
             );
         }
     }

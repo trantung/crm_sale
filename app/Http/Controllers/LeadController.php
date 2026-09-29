@@ -17,7 +17,6 @@ class LeadController extends Controller
     public function __construct(private LeadService $leads)
     {
         $this->authorizeResource(Lead::class, 'lead');
-        $this->middleware('can:create,'.Lead::class)->only(['importForm', 'importStore']);
     }
 
     public function index(Request $request): View
@@ -26,21 +25,43 @@ class LeadController extends Controller
         $query = Lead::query()
             ->with(['source', 'stage', 'owner', 'lastTouch'])
             ->visibleTo($user)
+            ->orderByDesc('updated_at')
             ->orderByDesc('id');
 
         if ($q = trim((string) $request->input('q', ''))) {
-            $query->where(function ($sub) use ($q) {
+            $digits = preg_replace('/\D+/', '', $q) ?: '';
+            $query->where(function ($sub) use ($q, $digits) {
                 $sub->where('name', 'like', '%'.$q.'%')
                     ->orWhere('phone', 'like', '%'.$q.'%')
                     ->orWhere('phone_normalized', 'like', '%'.$q.'%')
                     ->orWhere('email', 'like', '%'.$q.'%')
                     ->orWhere('code', 'like', '%'.$q.'%');
+
+                if ($digits !== '') {
+                    $sub->orWhere('phone', 'like', '%'.$digits.'%')
+                        ->orWhere('phone_normalized', 'like', '%'.$digits.'%');
+                    $tail = strlen($digits) >= 9 ? substr($digits, -9) : $digits;
+                    if ($tail !== $digits) {
+                        $sub->orWhere('phone_normalized', 'like', '%'.$tail.'%');
+                    }
+                }
             });
         }
 
         $tab = (string) $request->input('tab', '');
         if (in_array($tab, ['new', 'callback', 'recare'], true)) {
             $query->tab($tab);
+        }
+
+        if ($request->boolean('callback')) {
+            $query->tab('callback');
+        }
+
+        $level = strtoupper((string) $request->input('level', ''));
+        if (array_key_exists($level, LeadStage::levelTabs())) {
+            $query->level($level);
+        } else {
+            $level = '';
         }
 
         if ($request->filled('stage_id')) {
@@ -59,6 +80,14 @@ class LeadController extends Controller
             }
         }
 
+        if ($request->filled('last_called_from')) {
+            $query->whereDate('last_called_at', '>=', $request->input('last_called_from'));
+        }
+
+        if ($request->filled('last_called_to')) {
+            $query->whereDate('last_called_at', '<=', $request->input('last_called_to'));
+        }
+
         if ($campaign = trim((string) $request->input('utm_campaign', ''))) {
             $query->whereHas('lastTouch', fn ($t) => $t->where('utm_campaign', 'like', '%'.$campaign.'%'));
         }
@@ -71,37 +100,59 @@ class LeadController extends Controller
         $leads = $query->paginate($perPage)->withQueryString();
 
         $funnelQuery = Lead::query()->visibleTo($user);
-        $tabCounts = [
-            'new' => (clone $funnelQuery)->tab('new')->count(),
-            'callback' => (clone $funnelQuery)->tab('callback')->count(),
-            'recare' => (clone $funnelQuery)->tab('recare')->count(),
-        ];
-        $funnel = LeadStage::query()
+        $levelCounts = collect(LeadStage::levelTabs())
+            ->mapWithKeys(fn (string $label, string $key) => [
+                $key => (clone $funnelQuery)->level($key)->count(),
+            ]);
+
+        $stages = LeadStage::query()
+            ->whereNotNull('level_group')
             ->orderBy('sort_order')
-            ->get()
-            ->map(function (LeadStage $stage) use ($funnelQuery) {
-                return [
-                    'id' => $stage->id,
-                    'name' => $stage->name,
-                    'count' => (clone $funnelQuery)->where('stage_id', $stage->id)->count(),
-                ];
-            });
+            ->get();
 
         return view('leads.index', [
             'leads' => $leads,
-            'funnel' => $funnel,
-            'stages' => LeadStage::query()->orderBy('sort_order')->get(),
+            'stages' => $stages,
+            'levelTabs' => LeadStage::levelTabs(),
+            'levelCounts' => $levelCounts,
+            'currentLevel' => $level,
             'sources' => LeadSource::query()->orderBy('sort_order')->get(),
             'sales' => $user->isAdmin()
-                ? User::query()->where('role', User::ROLE_SALE)->orderBy('name')->get()
+                ? User::query()->where('role', User::ROLE_SALE)->where('is_active', true)->orderBy('name')->get()
                 : collect(),
-            'tabCounts' => $tabCounts,
-            'filters' => $request->only(['q', 'stage_id', 'source_id', 'owner_id', 'utm_campaign', 'tab', 'per_page']),
+            'filters' => $request->only([
+                'q', 'stage_id', 'source_id', 'owner_id', 'utm_campaign',
+                'tab', 'level', 'per_page', 'last_called_from', 'last_called_to', 'callback',
+            ]),
             'unassignedCount' => $user->isAdmin()
                 ? Lead::query()->whereNull('owner_id')->count()
                 : 0,
             'callResults' => Lead::CALL_RESULTS,
         ]);
+    }
+
+    public function bulkAssign(Request $request): RedirectResponse
+    {
+        $this->authorize('assignAny', Lead::class);
+
+        $data = $request->validate([
+            'lead_ids' => ['required', 'array', 'min:1'],
+            'lead_ids.*' => ['integer', 'exists:leads,id'],
+            'owner_id' => ['nullable', 'exists:users,id'],
+        ]);
+
+        $ownerId = $data['owner_id'] ? (int) $data['owner_id'] : null;
+        $count = 0;
+        foreach (Lead::query()->whereIn('id', $data['lead_ids'])->get() as $lead) {
+            $this->leads->assign($lead, $ownerId, $request->user());
+            $count++;
+        }
+
+        $message = $ownerId
+            ? "Đã chia {$count} lead cho tư vấn viên."
+            : "Đã bỏ phân công {$count} lead.";
+
+        return back()->with('status', $message);
     }
 
     public function create(): View
@@ -139,15 +190,19 @@ class LeadController extends Controller
             'stageHistories.toStage',
             'stageHistories.changer',
             'activities.user',
+            'orders.items',
         ]);
 
         return view('leads.show', [
             'lead' => $lead,
-            'stages' => LeadStage::query()->orderBy('sort_order')->get(),
+            'stages' => LeadStage::query()->whereNotNull('level_group')->orderBy('sort_order')->get(),
+            'levelTabs' => LeadStage::levelTabs(),
+            'stageDetails' => LeadStage::detailsByGroup(),
             'sales' => request()->user()->isAdmin()
                 ? User::query()->where('role', User::ROLE_SALE)->where('is_active', true)->orderBy('name')->get()
                 : collect(),
-            'activityTypes' => LeadActivity::TYPES,
+            'contactTypes' => LeadActivity::CONTACT_TYPES,
+            'customerTypes' => Lead::CUSTOMER_TYPES,
             'callResults' => Lead::CALL_RESULTS,
         ]);
     }
@@ -187,13 +242,43 @@ class LeadController extends Controller
         $this->authorize('update', $lead);
 
         $data = $request->validate([
-            'stage_id' => ['required', 'exists:lead_stages,id'],
+            'level_group' => ['required', 'in:'.implode(',', array_keys(LeadStage::levelTabs()))],
+            'stage_id' => ['nullable', 'exists:lead_stages,id'],
             'reason' => ['nullable', 'string', 'max:500'],
         ]);
 
-        $this->leads->changeStage($lead, (int) $data['stage_id'], $request->user(), $data['reason'] ?? null);
+        $stageId = $data['stage_id'] ?? null;
+        $details = LeadStage::detailsByGroup()[$data['level_group']] ?? [];
+        if ($details && ! $stageId) {
+            return back()->withErrors(['stage_id' => 'Hãy chọn mức chi tiết của level.']);
+        }
+        if ($stageId) {
+            $stage = LeadStage::query()->findOrFail((int) $stageId);
+            if ($stage->level_group !== $data['level_group']) {
+                return back()->withErrors(['stage_id' => 'Mức chi tiết không khớp level đã chọn.']);
+            }
+        } else {
+            $mainSlug = strtolower($data['level_group']);
+            $stage = LeadStage::query()->where('slug', $mainSlug)->firstOrFail();
+        }
 
-        return back()->with('status', 'Đã chuyển trạng thái lead.');
+        $this->leads->changeStage($lead, (int) $stage->id, $request->user(), $data['reason'] ?? null);
+
+        return back()->with('status', 'Đã cập nhật level lead.');
+    }
+
+    public function classify(Request $request, Lead $lead): RedirectResponse
+    {
+        $this->authorize('update', $lead);
+
+        $data = $request->validate([
+            'customer_type' => ['nullable', 'in:'.implode(',', array_keys(Lead::CUSTOMER_TYPES))],
+        ]);
+
+        $lead->customer_type = $data['customer_type'] ?: null;
+        $lead->save();
+
+        return back()->with('status', 'Đã cập nhật phân loại lead.');
     }
 
     public function assign(Request $request, Lead $lead): RedirectResponse
@@ -214,18 +299,38 @@ class LeadController extends Controller
         $this->authorize('update', $lead);
 
         $data = $request->validate([
-            'type' => ['required', 'in:note,call,chat,meeting'],
+            'type' => ['required', 'in:'.implode(',', array_keys(LeadActivity::CONTACT_TYPES))],
+            'call_result' => ['required', 'in:'.implode(',', array_keys(Lead::CALL_RESULTS))],
             'content' => ['required', 'string', 'max:5000'],
+            'callback_at' => ['nullable', 'date'],
         ]);
+
+        $lead->call_result = $data['call_result'];
+        if ($data['type'] === 'call') {
+            $lead->last_called_at = now();
+        }
+        if (! empty($data['callback_at'])) {
+            $lead->callback_at = $data['callback_at'];
+            $lead->call_result = 'callback';
+        } elseif ($data['call_result'] !== 'callback') {
+            $lead->callback_at = null;
+        }
+
+        $content = $data['content'];
+        $content = 'Trạng thái: '.(Lead::CALL_RESULTS[$lead->call_result] ?? $lead->call_result).'. '.$content;
+        if ($lead->callback_at) {
+            $content .= ' — hẹn liên hệ lại '.$lead->callback_at->format('d/m/Y H:i');
+        }
+        $lead->save();
 
         LeadActivity::query()->create([
             'lead_id' => $lead->id,
             'user_id' => $request->user()->id,
             'type' => $data['type'],
-            'content' => $data['content'],
+            'content' => $content,
         ]);
 
-        return back()->with('status', 'Đã ghi hoạt động.');
+        return back()->with('status', 'Đã ghi nội dung liên hệ.');
     }
 
     public function logCall(Request $request, Lead $lead): RedirectResponse
@@ -247,54 +352,6 @@ class LeadController extends Controller
         );
 
         return back()->with('status', 'Đã ghi kết quả cuộc gọi.');
-    }
-
-    public function importForm(): View
-    {
-        $this->authorize('create', Lead::class);
-
-        return view('leads.import');
-    }
-
-    public function importStore(Request $request): RedirectResponse
-    {
-        $this->authorize('create', Lead::class);
-
-        $request->validate([
-            'file' => ['required', 'file', 'mimes:csv,txt', 'max:2048'],
-        ]);
-
-        $handle = fopen($request->file('file')->getRealPath(), 'r');
-        if (! $handle) {
-            return back()->withErrors(['file' => 'Không đọc được file.']);
-        }
-
-        $header = fgetcsv($handle);
-        $created = 0;
-        $updated = 0;
-        $user = $request->user();
-
-        while (($row = fgetcsv($handle)) !== false) {
-            if (! $header || count($row) < 2) {
-                continue;
-            }
-            $row = array_combine($header, array_pad($row, count($header), null));
-            $payload = [
-                'name' => $row['name'] ?? $row['ten'] ?? '',
-                'phone' => $row['phone'] ?? $row['sdt'] ?? '',
-                'email' => $row['email'] ?? '',
-                'source_code' => $row['source_code'] ?? $row['nguon'] ?? 'other',
-                'note' => $row['note'] ?? $row['ghi_chu'] ?? null,
-            ];
-            if (empty($payload['phone']) && empty($payload['email'])) {
-                continue;
-            }
-            $result = $this->leads->ingest($payload, 'crm', $user);
-            $result['created'] ? $created++ : $updated++;
-        }
-        fclose($handle);
-
-        return redirect()->route('leads.index')->with('status', "Import xong: {$created} lead mới, {$updated} lead đã có (ghi lần chạm).");
     }
 
     /**

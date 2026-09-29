@@ -37,9 +37,12 @@ class LeadService
         $normalized = self::normalizePhone($phone);
 
         if ($normalized === null && $email === '') {
-            throw ValidationException::withMessages([
-                'phone' => 'Cần ít nhất số điện thoại hoặc email.',
-            ]);
+            $nameOnly = (bool) ($payload['allow_name_only'] ?? false);
+            if (! $nameOnly || trim((string) ($payload['name'] ?? '')) === '') {
+                throw ValidationException::withMessages([
+                    'phone' => 'Cần ít nhất số điện thoại hoặc email.',
+                ]);
+            }
         }
 
         $source = $this->resolveSource($payload['source_code'] ?? null);
@@ -100,9 +103,9 @@ class LeadService
                 if (! $lead->source_id && $source) {
                     $updates['source_id'] = $source->id;
                 }
-                if ($updates) {
-                    $lead->fill($updates)->save();
-                }
+                $lead->fill($updates);
+                $lead->touch();
+                $lead->save();
             }
 
             $touch = $this->recordTouch($lead, $payload, $channel);
@@ -130,20 +133,25 @@ class LeadService
     public function changeStage(Lead $lead, int $toStageId, ?User $actor, ?string $reason = null): Lead
     {
         $toStage = LeadStage::query()->findOrFail($toStageId);
+        $reason = is_string($reason) ? trim($reason) : null;
+        $reason = $reason !== '' ? $reason : null;
+        $sameStage = (int) $lead->stage_id === (int) $toStage->id;
 
-        if ((int) $lead->stage_id === (int) $toStage->id) {
+        if ($sameStage && $reason === null) {
             return $lead;
         }
 
-        if ($toStage->slug === 'consulting' && ! $lead->phone && ! $lead->phone_normalized) {
+        if (! $sameStage && in_array($toStage->level_group, ['L3', 'L4', 'L5', 'L6'], true) && ! $lead->phone && ! $lead->phone_normalized) {
             throw ValidationException::withMessages([
-                'stage_id' => 'Cần số điện thoại trước khi chuyển sang Đang tư vấn.',
+                'stage_id' => 'Cần số điện thoại trước khi chuyển sang '.$toStage->name.'.',
             ]);
         }
 
         $fromId = $lead->stage_id;
-        $lead->stage_id = $toStage->id;
-        $lead->save();
+        if (! $sameStage) {
+            $lead->stage_id = $toStage->id;
+            $lead->save();
+        }
 
         LeadStageHistory::query()->create([
             'lead_id' => $lead->id,
@@ -152,6 +160,15 @@ class LeadService
             'changed_by' => $actor?->id,
             'reason' => $reason,
         ]);
+
+        if ($reason) {
+            LeadActivity::query()->create([
+                'lead_id' => $lead->id,
+                'user_id' => $actor?->id,
+                'type' => 'note',
+                'content' => ($sameStage ? 'Ghi chú level '.$toStage->name : 'Chuyển level sang '.$toStage->name).': '.$reason,
+            ]);
+        }
 
         return $lead->fresh(['stage']);
     }
@@ -169,8 +186,8 @@ class LeadService
             'user_id' => $actor->id,
             'type' => 'note',
             'content' => $owner
-                ? 'Admin phân lead cho '.$owner->name.' ('.$owner->username.')'
-                : 'Admin bỏ phân công lead',
+                ? 'Quản lý phân lead cho TVV '.$owner->name.' ('.$owner->username.')'
+                : 'Quản lý bỏ phân công lead',
         ]);
 
         return $lead->fresh(['owner']);

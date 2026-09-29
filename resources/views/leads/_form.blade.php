@@ -29,7 +29,7 @@
 </div>
 @if (Auth::user()->isAdmin() && empty($lead))
     <div>
-        <label class="ts-label" for="owner_id">Phân cho sale</label>
+                    <label class="ts-label" for="owner_id">Phân cho tư vấn viên</label>
         <select id="owner_id" name="owner_id" class="ts-select">
             <option value="">Chưa phân</option>
             @foreach ($sales as $sale)

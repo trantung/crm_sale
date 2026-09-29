@@ -13,6 +13,13 @@ class Lead extends Model
 {
     use SoftDeletes;
 
+    public const CUSTOMER_TYPES = [
+        'student' => 'Học sinh',
+        'university_student' => 'Sinh viên',
+        'parent' => 'Phụ huynh mua cho con',
+        'working' => 'Người đi làm',
+    ];
+
     public const CALL_RESULTS = [
         'not_called' => 'Chưa gọi',
         'no_answer' => 'Tắt máy',
@@ -35,6 +42,7 @@ class Lead extends Model
         'owner_id',
         'created_by',
         'interested_product',
+        'customer_type',
         'note',
         'call_result',
         'last_called_at',
@@ -99,6 +107,11 @@ class Lead extends Model
         return $this->hasMany(LeadActivity::class)->orderByDesc('id');
     }
 
+    public function orders(): HasMany
+    {
+        return $this->hasMany(Order::class)->orderByDesc('id');
+    }
+
     public function scopeVisibleTo(Builder $query, User $user): Builder
     {
         if ($user->isAdmin()) {
@@ -106,6 +119,15 @@ class Lead extends Model
         }
 
         return $query->where('owner_id', $user->id);
+    }
+
+    public function scopeLevel(Builder $query, ?string $level): Builder
+    {
+        if (! $level || ! array_key_exists($level, LeadStage::levelTabs())) {
+            return $query;
+        }
+
+        return $query->whereHas('stage', fn (Builder $stage) => $stage->where('level_group', $level));
     }
 
     public function scopeTab(Builder $query, ?string $tab): Builder
@@ -124,6 +146,15 @@ class Lead extends Model
                 }),
             default => $query,
         };
+    }
+
+    public function customerTypeLabel(): string
+    {
+        if (! $this->customer_type) {
+            return '—';
+        }
+
+        return self::CUSTOMER_TYPES[$this->customer_type] ?? $this->customer_type;
     }
 
     public function formattedPhone(): string

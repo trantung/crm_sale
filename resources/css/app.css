@@ -407,19 +407,117 @@
 
     .ts-login {
         min-height: 100vh;
-        background: radial-gradient(circle at top, #16365c, #0b1d33);
+        position: relative;
         display: flex;
-        flex-direction: column;
-        min-height: 100vh;
+        align-items: center;
+        justify-content: center;
+        padding: 24px 16px;
+        background: #0b1d33;
+    }
+
+    .ts-login-bg {
+        position: absolute;
+        inset: 0;
+        background:
+            radial-gradient(ellipse 80% 60% at 50% -10%, rgba(245, 158, 11, 0.22), transparent 55%),
+            radial-gradient(circle at 15% 85%, rgba(22, 54, 92, 0.9), transparent 42%),
+            radial-gradient(circle at 90% 20%, rgba(15, 39, 68, 0.95), transparent 40%),
+            linear-gradient(180deg, #102844 0%, #0b1d33 100%);
+    }
+
+    .ts-login-center {
+        position: relative;
+        z-index: 1;
+        width: 100%;
+        max-width: 420px;
     }
 
     .ts-login-card {
         width: 100%;
-        max-width: 420px;
         background: #fff;
-        border-radius: 16px;
-        padding: 32px 28px;
-        box-shadow: 0 20px 50px rgba(0, 0, 0, 0.25);
+        border-radius: 18px;
+        padding: 36px 32px 28px;
+        box-shadow: 0 24px 60px rgba(0, 0, 0, 0.35);
+        border-top: 4px solid #f59e0b;
+    }
+
+    .ts-login-head {
+        margin-bottom: 24px;
+        text-align: center;
+    }
+
+    .ts-login-mark {
+        display: inline-block;
+        background: #f59e0b;
+        color: #0f2744;
+        font-size: 12px;
+        font-weight: 800;
+        letter-spacing: 0.14em;
+        padding: 5px 10px;
+        border-radius: 6px;
+        margin-bottom: 14px;
+    }
+
+    .ts-login-head h1 {
+        color: #0f2744;
+        font-size: 26px;
+        font-weight: 800;
+        line-height: 1.2;
+        margin: 0;
+    }
+
+    .ts-login-head p {
+        margin: 8px 0 0;
+        color: #64748b;
+        font-size: 13px;
+    }
+
+    .ts-login-form {
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+    }
+
+    .ts-login-form .ts-input {
+        padding: 11px 13px;
+    }
+
+    .ts-login-form .ts-input:focus {
+        outline: none;
+        border-color: #f59e0b;
+        box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.18);
+    }
+
+    .ts-login-remember {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 13px;
+        color: #475569;
+        font-weight: 500;
+        cursor: pointer;
+    }
+
+    .ts-login-submit {
+        width: 100%;
+        justify-content: center;
+        padding: 12px 14px;
+        font-size: 15px;
+        margin-top: 4px;
+    }
+
+    .ts-login-status {
+        margin-bottom: 14px;
+        font-size: 13px;
+        font-weight: 600;
+        color: #047857;
+    }
+
+    .ts-login-foot {
+        text-align: center;
+        color: #9bb3cc;
+        font-size: 12px;
+        margin-top: 18px;
     }
 
     .ts-modal-bg {
@@ -488,5 +586,160 @@
     .ts-page-link[aria-disabled="true"] {
         opacity: 0.4;
         pointer-events: none;
+    }
+
+    .ts-filter-grid {
+        display: grid;
+        grid-template-columns: repeat(1, minmax(0, 1fr));
+        gap: 12px;
+        background: #fff;
+        border: 1px solid #d7e2ee;
+        border-radius: 12px;
+        padding: 16px;
+    }
+
+    @media (min-width: 768px) {
+        .ts-filter-grid {
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+        }
+    }
+
+    .ts-bulk {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        flex-wrap: wrap;
+        background: #fff7ed;
+        border: 1px solid #fdba74;
+        border-radius: 12px;
+        padding: 10px 14px;
+        margin-bottom: 12px;
+    }
+
+    .ts-import {
+        max-width: 720px;
+    }
+
+    .ts-import-head {
+        margin-bottom: 16px;
+    }
+
+    .ts-import-head h2 {
+        margin: 0 0 6px;
+        font-size: 20px;
+        font-weight: 800;
+        color: #0f2744;
+        text-transform: none;
+        letter-spacing: 0;
+    }
+
+    .ts-import-head p {
+        margin: 0;
+        font-size: 13px;
+        line-height: 1.5;
+        color: #5b6b7c;
+    }
+
+    .ts-file-box {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        padding: 14px 16px;
+        border: 1.5px dashed #b8c9dc;
+        border-radius: 12px;
+        background: #f7fafc;
+    }
+
+    .ts-file-box:hover {
+        border-color: #0f2744;
+        background: #f3f7fb;
+    }
+
+    .ts-file-icon {
+        width: 44px;
+        height: 44px;
+        border-radius: 10px;
+        background: #0f2744;
+        color: #fff;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+        font-size: 18px;
+    }
+
+    .ts-file-meta {
+        min-width: 0;
+        flex: 1;
+    }
+
+    .ts-file-meta strong {
+        display: block;
+        font-size: 14px;
+        color: #0f2744;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .ts-file-meta span {
+        display: block;
+        margin-top: 2px;
+        font-size: 12px;
+        color: #64748b;
+    }
+
+    .ts-file-actions {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        flex-shrink: 0;
+        flex-wrap: wrap;
+    }
+
+    .ts-file-actions .ts-btn {
+        white-space: nowrap;
+    }
+
+    .ts-import-submit {
+        display: flex;
+        align-items: center;
+        justify-content: flex-end;
+        gap: 8px;
+        margin-top: 14px;
+    }
+
+    .ts-import-cols {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+        margin-top: 14px;
+    }
+
+    .ts-import-cols em {
+        font-style: normal;
+        background: #eef3f8;
+        color: #334155;
+        border-radius: 999px;
+        padding: 4px 10px;
+        font-size: 12px;
+        font-weight: 600;
+    }
+
+    @media (max-width: 640px) {
+        .ts-file-box {
+            flex-wrap: wrap;
+        }
+
+        .ts-file-actions,
+        .ts-import-submit {
+            width: 100%;
+        }
+
+        .ts-file-actions .ts-btn,
+        .ts-import-submit .ts-btn {
+            flex: 1;
+            justify-content: center;
+        }
     }
 }

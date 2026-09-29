@@ -53,8 +53,13 @@ class User extends Authenticatable
         return $this->hasMany(Lead::class, 'owner_id');
     }
 
+    public function assignedOrders(): HasMany
+    {
+        return $this->hasMany(Order::class, 'owner_id');
+    }
+
     public function roleLabel(): string
     {
-        return $this->isAdmin() ? 'Admin' : 'Sale';
+        return $this->isAdmin() ? 'Quản lý' : 'Tư vấn viên';
     }
 }

@@ -11,18 +11,13 @@
     </head>
     <body class="ts-body antialiased">
         <div class="ts-login">
-            <header class="ts-topbar">
-                <div class="ts-brand"><span>CRM</span> TELESALE</div>
-            </header>
-            <div class="flex-1 flex items-center justify-center p-6">
+            <div class="ts-login-bg" aria-hidden="true"></div>
+            <div class="ts-login-center">
                 <div class="ts-login-card">
                     {{ $slot }}
                 </div>
+                <div class="ts-login-foot">CRM Telesale · ieltscheckmate.com</div>
             </div>
-            <footer class="ts-footer">
-                <div>CRM Telesale · Checkmate</div>
-                <div>ieltscheckmate.com</div>
-            </footer>
         </div>
     </body>
 </html>

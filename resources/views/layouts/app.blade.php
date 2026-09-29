@@ -22,7 +22,7 @@
                 </form>
 
                 <div class="ts-top-actions">
-                    <a class="ts-bell" href="{{ route('leads.index', ['tab' => 'callback']) }}" title="Hẹn gọi lại hôm nay">
+                    <a class="ts-bell" href="{{ route('leads.index', ['callback' => 1]) }}" title="Hẹn gọi lại hôm nay">
                         <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.4-1.4A2 2 0 0118 14.2V11a6 6 0 10-12 0v3.2a2 2 0 01-.6 1.4L4 17h5m6 0a3 3 0 11-6 0"/></svg>
                         @if (($headerAlertCount ?? 0) > 0)
                             <em>{{ $headerAlertCount > 9 ? '9+' : $headerAlertCount }}</em>
@@ -47,6 +47,8 @@
                 <div class="max-w-[1440px] mx-auto px-5 flex gap-5 h-10 items-center">
                     <a href="{{ route('dashboard') }}" class="{{ request()->routeIs('dashboard') ? 'text-amber-400 font-semibold' : 'hover:text-white' }}">Tổng quan</a>
                     <a href="{{ route('leads.index') }}" class="{{ request()->routeIs('leads.*') ? 'text-amber-400 font-semibold' : 'hover:text-white' }}">Quản lý Leads</a>
+                    <a href="{{ route('orders.index') }}" class="{{ request()->routeIs('orders.*') ? 'text-amber-400 font-semibold' : 'hover:text-white' }}">Doanh thu</a>
+                    <a href="{{ route('products.index') }}" class="{{ request()->routeIs('products.*') ? 'text-amber-400 font-semibold' : 'hover:text-white' }}">Sản phẩm</a>
                     @can('admin')
                         <a href="{{ route('users.index') }}" class="{{ request()->routeIs('users.*') ? 'text-amber-400 font-semibold' : 'hover:text-white' }}">Users</a>
                     @endcan
@@ -60,6 +62,8 @@
                 </form>
                 <a class="block py-1" href="{{ route('dashboard') }}">Tổng quan</a>
                 <a class="block py-1" href="{{ route('leads.index') }}">Quản lý Leads</a>
+                <a class="block py-1" href="{{ route('orders.index') }}">Doanh thu</a>
+                <a class="block py-1" href="{{ route('products.index') }}">Sản phẩm</a>
                 @can('admin')
                     <a class="block py-1" href="{{ route('users.index') }}">Users</a>
                 @endcan

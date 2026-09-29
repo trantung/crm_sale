@@ -8,10 +8,22 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 class LeadActivity extends Model
 {
     public const TYPES = [
-        'note' => 'Ghi chú',
         'call' => 'Gọi điện',
+        'zalo' => 'Nhắn tin Zalo',
+        'sms' => 'Nhắn tin SMS',
+        'facebook' => 'Nhắn tin Facebook',
+        'email' => 'Email',
+        'note' => 'Ghi chú',
         'chat' => 'Chat',
         'meeting' => 'Hẹn gặp',
+    ];
+
+    public const CONTACT_TYPES = [
+        'call' => 'Gọi điện',
+        'zalo' => 'Nhắn tin Zalo',
+        'sms' => 'Nhắn tin SMS',
+        'facebook' => 'Nhắn tin Facebook',
+        'email' => 'Email',
     ];
 
     protected $fillable = [
