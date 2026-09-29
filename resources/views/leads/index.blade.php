@@ -18,7 +18,7 @@
     $levelQuery = fn (?string $value) => route('leads.index', $keep(['level' => $value, 'callback' => null]));
     $hasAdvanced = ($filters['stage_id'] ?? '') || ($filters['source_id'] ?? '') || ($filters['owner_id'] ?? '')
         || ($filters['utm_campaign'] ?? '') || ($filters['last_called_from'] ?? '') || ($filters['last_called_to'] ?? '');
-    $colspan = Auth::user()->isAdmin() ? 8 : 7;
+    $colspan = Auth::user()->isAdmin() ? 7 : 6;
 @endphp
 
 <x-app-layout title="{{ $tabTitle }} · CRM Telesale">
@@ -149,7 +149,6 @@
                         <th>Khách hàng</th>
                         <th>Số điện thoại</th>
                         <th>Nguồn</th>
-                        <th>Trạng thái</th>
                         <th>Lần cuối gọi</th>
                         @if (Auth::user()->isAdmin())
                             <th>Tư vấn viên</th>
@@ -173,12 +172,6 @@
                             </td>
                             <td class="whitespace-nowrap">{{ $lead->formattedPhone() }}</td>
                             <td>{{ $lead->source?->name ?? '—' }}</td>
-                            <td>
-                                <span class="ts-status">
-                                    <i class="ts-dot ts-dot-{{ $lead->callStatusTone() }}"></i>
-                                    {{ $lead->callStatusLabel() }}
-                                </span>
-                            </td>
                             <td class="text-slate-500 whitespace-nowrap">{{ $lead->lastCallLabel() }}</td>
                             @if (Auth::user()->isAdmin())
                                 <td>{{ $lead->owner?->name ?? 'Chưa phân' }}</td>

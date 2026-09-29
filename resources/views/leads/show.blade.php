@@ -154,14 +154,6 @@
                         </select>
                     </div>
                     <div>
-                        <label class="ts-label">Trạng thái</label>
-                        <select name="call_result" class="ts-select" required>
-                            @foreach ($callResults as $value => $label)
-                                <option value="{{ $value }}" @selected(old('call_result', $lead->call_result ?: 'not_called') === $value)>{{ $label }}</option>
-                            @endforeach
-                        </select>
-                    </div>
-                    <div>
                         <label class="ts-label">Nội dung trao đổi</label>
                         <textarea name="content" rows="3" class="ts-textarea" required placeholder="Nội dung trao đổi với khách...">{{ old('content') }}</textarea>
                     </div>

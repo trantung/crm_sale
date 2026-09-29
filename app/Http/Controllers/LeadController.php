@@ -203,7 +203,6 @@ class LeadController extends Controller
                 : collect(),
             'contactTypes' => LeadActivity::CONTACT_TYPES,
             'customerTypes' => Lead::CUSTOMER_TYPES,
-            'callResults' => Lead::CALL_RESULTS,
         ]);
     }
 
@@ -300,24 +299,24 @@ class LeadController extends Controller
 
         $data = $request->validate([
             'type' => ['required', 'in:'.implode(',', array_keys(LeadActivity::CONTACT_TYPES))],
-            'call_result' => ['required', 'in:'.implode(',', array_keys(Lead::CALL_RESULTS))],
             'content' => ['required', 'string', 'max:5000'],
             'callback_at' => ['nullable', 'date'],
         ]);
 
-        $lead->call_result = $data['call_result'];
         if ($data['type'] === 'call') {
             $lead->last_called_at = now();
         }
         if (! empty($data['callback_at'])) {
             $lead->callback_at = $data['callback_at'];
             $lead->call_result = 'callback';
-        } elseif ($data['call_result'] !== 'callback') {
+        } else {
             $lead->callback_at = null;
+            if ($lead->call_result === 'callback') {
+                $lead->call_result = 'not_called';
+            }
         }
 
         $content = $data['content'];
-        $content = 'Trạng thái: '.(Lead::CALL_RESULTS[$lead->call_result] ?? $lead->call_result).'. '.$content;
         if ($lead->callback_at) {
             $content .= ' — hẹn liên hệ lại '.$lead->callback_at->format('d/m/Y H:i');
         }
