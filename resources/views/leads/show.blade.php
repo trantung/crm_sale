@@ -7,7 +7,8 @@
             <strong>{{ $lead->code ?: 'LD-'.$lead->id }}</strong>
         </div>
         <div class="ts-actions">
-            <a href="{{ route('orders.create', ['lead_id' => $lead->id]) }}" class="ts-btn ts-btn-primary">+ Tạo đơn</a>
+            <button class="ts-btn ts-btn-primary" type="submit" form="lead-save-all">Lưu toàn bộ</button>
+            <a href="{{ route('orders.create', ['lead_id' => $lead->id]) }}" class="ts-btn ts-btn-ghost">+ Tạo đơn</a>
             <a href="{{ route('leads.edit', $lead) }}" class="ts-btn ts-btn-ghost">Sửa</a>
             @can('delete', $lead)
                 <form method="POST" action="{{ route('leads.destroy', $lead) }}" onsubmit="return confirm('Xóa lead này?')">
@@ -19,7 +20,8 @@
         </div>
     </div>
 
-    <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+    <form id="lead-save-all" method="POST" action="{{ route('leads.save-all', $lead) }}" class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        @csrf
         <div class="lg:col-span-2 space-y-4">
             <div class="ts-panel p-5">
                 <div class="flex flex-wrap items-start justify-between gap-3">
@@ -143,11 +145,10 @@
 
             <div class="ts-panel p-5">
                 <div class="ts-card-title">Ghi liên hệ</div>
-                <form method="POST" action="{{ route('leads.activities.store', $lead) }}" class="grid grid-cols-1 gap-3 mb-5">
-                    @csrf
+                <div class="grid grid-cols-1 gap-3 mb-5">
                     <div>
                         <label class="ts-label">Hình thức</label>
-                        <select name="type" class="ts-select" required>
+                        <select name="type" class="ts-select">
                             @foreach ($contactTypes as $value => $label)
                                 <option value="{{ $value }}" @selected(old('type', 'call') === $value)>{{ $label }}</option>
                             @endforeach
@@ -155,16 +156,13 @@
                     </div>
                     <div>
                         <label class="ts-label">Nội dung trao đổi</label>
-                        <textarea name="content" rows="3" class="ts-textarea" required placeholder="Nội dung trao đổi với khách...">{{ old('content') }}</textarea>
+                        <textarea name="content" rows="3" class="ts-textarea" placeholder="Nội dung trao đổi với khách...">{{ old('content') }}</textarea>
                     </div>
                     <div>
                         <label class="ts-label">Hẹn liên hệ lại</label>
                         <input type="datetime-local" name="callback_at" class="ts-input" value="{{ old('callback_at', $lead->callback_at?->format('Y-m-d\TH:i')) }}">
                     </div>
-                    <div class="flex justify-end">
-                        <button class="ts-btn ts-btn-primary" type="submit">Lưu liên hệ</button>
-                    </div>
-                </form>
+                </div>
                 <div class="ts-label mb-2">Lịch sử liên hệ</div>
                 <ul class="space-y-3 text-sm">
                     @forelse ($lead->activities as $activity)
@@ -183,13 +181,12 @@
 
         <div class="space-y-4">
             <div class="ts-panel p-5" x-data="{
-                level: '{{ $lead->stage?->level_group ?: 'L0' }}',
-                detailId: '{{ $lead->stage && ! $lead->stage->isMain() ? $lead->stage_id : '' }}',
+                level: '{{ old('level_group', $lead->stage?->level_group ?: 'L0') }}',
+                detailId: '{{ old('stage_id', $lead->stage && ! $lead->stage->isMain() ? $lead->stage_id : '') }}',
                 details: {{ \Illuminate\Support\Js::from($stageDetails) }}
             }">
                 <div class="ts-card-title">Chuyển level</div>
-                <form method="POST" action="{{ route('leads.stage', $lead) }}" class="space-y-3">
-                    @csrf
+                <div class="space-y-3">
                     <div>
                         <label class="ts-label">Level chính</label>
                         <select name="level_group" class="ts-select" x-model="level" @change="detailId = ''">
@@ -214,37 +211,28 @@
                         <label class="ts-label" for="stage-reason">Lý do (tuỳ chọn)</label>
                         <textarea id="stage-reason" name="reason" rows="3" class="ts-textarea" placeholder="Ví dụ: khách hẹn chuyển khoản, sai đối tượng...">{{ old('reason') }}</textarea>
                     </div>
-                    <button class="ts-btn ts-btn-primary" type="submit">Cập nhật level</button>
-                </form>
+                </div>
             </div>
 
             <div class="ts-panel p-5">
                 <div class="ts-card-title">Phân loại lead</div>
-                <form method="POST" action="{{ route('leads.classify', $lead) }}" class="space-y-3">
-                    @csrf
-                    <select name="customer_type" class="ts-select">
-                        <option value="">— Chọn phân loại —</option>
-                        @foreach ($customerTypes as $value => $label)
-                            <option value="{{ $value }}" @selected(old('customer_type', $lead->customer_type) === $value)>{{ $label }}</option>
-                        @endforeach
-                    </select>
-                    <button class="ts-btn ts-btn-primary" type="submit">Lưu phân loại</button>
-                </form>
+                <select name="customer_type" class="ts-select">
+                    <option value="">— Chọn phân loại —</option>
+                    @foreach ($customerTypes as $value => $label)
+                        <option value="{{ $value }}" @selected(old('customer_type', $lead->customer_type) === $value)>{{ $label }}</option>
+                    @endforeach
+                </select>
             </div>
 
             @can('assign', $lead)
                 <div class="ts-panel p-5">
                     <div class="ts-card-title">Phân tư vấn viên</div>
-                    <form method="POST" action="{{ route('leads.assign', $lead) }}" class="space-y-3">
-                        @csrf
-                        <select name="owner_id" class="ts-select">
-                            <option value="">Chưa phân</option>
-                            @foreach ($sales as $sale)
-                                <option value="{{ $sale->id }}" @selected($lead->owner_id === $sale->id)>{{ $sale->name }} ({{ $sale->username }})</option>
-                            @endforeach
-                        </select>
-                        <button class="ts-btn ts-btn-primary" type="submit">Lưu phân công</button>
-                    </form>
+                    <select name="owner_id" class="ts-select">
+                        <option value="">Chưa phân</option>
+                        @foreach ($sales as $sale)
+                            <option value="{{ $sale->id }}" @selected((string) old('owner_id', $lead->owner_id) === (string) $sale->id)>{{ $sale->name }} ({{ $sale->username }})</option>
+                        @endforeach
+                    </select>
                 </div>
             @endcan
 
@@ -263,5 +251,9 @@
                 </ul>
             </div>
         </div>
-    </div>
+
+        <div class="lg:col-span-3 flex justify-end">
+            <button class="ts-btn ts-btn-primary" type="submit">Lưu toàn bộ</button>
+        </div>
+    </form>
 </x-app-layout>

@@ -23,6 +23,7 @@ Route::middleware(['auth', 'active'])->group(function () {
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
 
     Route::post('leads/bulk-assign', [LeadController::class, 'bulkAssign'])->name('leads.bulk-assign');
+    Route::post('leads/{lead}/save-all', [LeadController::class, 'saveAll'])->name('leads.save-all')->whereNumber('lead');
     Route::post('leads/{lead}/stage', [LeadController::class, 'changeStage'])->name('leads.stage')->whereNumber('lead');
     Route::post('leads/{lead}/classify', [LeadController::class, 'classify'])->name('leads.classify')->whereNumber('lead');
     Route::post('leads/{lead}/assign', [LeadController::class, 'assign'])->name('leads.assign')->whereNumber('lead');

@@ -10,6 +10,9 @@ use App\Models\User;
 use App\Services\LeadService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 
 class LeadController extends Controller
@@ -240,30 +243,62 @@ class LeadController extends Controller
     {
         $this->authorize('update', $lead);
 
-        $data = $request->validate([
-            'level_group' => ['required', 'in:'.implode(',', array_keys(LeadStage::levelTabs()))],
-            'stage_id' => ['nullable', 'exists:lead_stages,id'],
-            'reason' => ['nullable', 'string', 'max:500'],
-        ]);
-
-        $stageId = $data['stage_id'] ?? null;
-        $details = LeadStage::detailsByGroup()[$data['level_group']] ?? [];
-        if ($details && ! $stageId) {
-            return back()->withErrors(['stage_id' => 'Hãy chọn mức chi tiết của level.']);
-        }
-        if ($stageId) {
-            $stage = LeadStage::query()->findOrFail((int) $stageId);
-            if ($stage->level_group !== $data['level_group']) {
-                return back()->withErrors(['stage_id' => 'Mức chi tiết không khớp level đã chọn.']);
-            }
-        } else {
-            $mainSlug = strtolower($data['level_group']);
-            $stage = LeadStage::query()->where('slug', $mainSlug)->firstOrFail();
-        }
-
+        $data = $request->validate($this->stageRules());
+        $stage = $this->resolveStage($data);
         $this->leads->changeStage($lead, (int) $stage->id, $request->user(), $data['reason'] ?? null);
 
         return back()->with('status', 'Đã cập nhật level lead.');
+    }
+
+    public function saveAll(Request $request, Lead $lead): RedirectResponse
+    {
+        $this->authorize('update', $lead);
+
+        $rules = array_merge($this->stageRules(), [
+            'type' => ['nullable', 'in:'.implode(',', array_keys(LeadActivity::CONTACT_TYPES))],
+            'content' => ['nullable', 'string', 'max:5000'],
+            'callback_at' => ['nullable', 'date'],
+            'customer_type' => ['nullable', 'in:'.implode(',', array_keys(Lead::CUSTOMER_TYPES))],
+        ]);
+        if ($request->user()->can('assign', $lead)) {
+            $rules['owner_id'] = ['nullable', 'exists:users,id'];
+        }
+
+        $data = $request->validate($rules);
+        $content = trim((string) ($data['content'] ?? ''));
+        if ($content !== '' && empty($data['type'])) {
+            throw ValidationException::withMessages([
+                'type' => 'Hãy chọn hình thức liên hệ.',
+            ]);
+        }
+
+        $user = $request->user();
+        $reason = trim((string) ($data['reason'] ?? ''));
+        $stageId = $data['stage_id'] ?? null;
+        $levelUnchanged = ($lead->stage?->level_group === $data['level_group'])
+            && ($stageId === null || $stageId === '' || (int) $stageId === (int) $lead->stage_id)
+            && $reason === '';
+
+        DB::transaction(function () use ($lead, $data, $content, $user, $levelUnchanged) {
+            if (! $levelUnchanged) {
+                $stage = $this->resolveStage($data);
+                $lead = $this->leads->changeStage($lead, (int) $stage->id, $user, $data['reason'] ?? null);
+            }
+            $lead->customer_type = ($data['customer_type'] ?? '') ?: null;
+
+            if ($user->can('assign', $lead)) {
+                $newOwner = ! empty($data['owner_id']) ? (int) $data['owner_id'] : null;
+                $currentOwner = $lead->owner_id ? (int) $lead->owner_id : null;
+                if ($newOwner !== $currentOwner) {
+                    $lead = $this->leads->assign($lead, $newOwner, $user);
+                }
+            }
+
+            $this->applyContact($lead, $data, $content);
+            $lead->save();
+        });
+
+        return back()->with('status', 'Đã lưu toàn bộ thông tin lead.');
     }
 
     public function classify(Request $request, Lead $lead): RedirectResponse
@@ -351,6 +386,88 @@ class LeadController extends Controller
         );
 
         return back()->with('status', 'Đã ghi kết quả cuộc gọi.');
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function stageRules(): array
+    {
+        return [
+            'level_group' => ['required', 'in:'.implode(',', array_keys(LeadStage::levelTabs()))],
+            'stage_id' => ['nullable', 'exists:lead_stages,id'],
+            'reason' => ['nullable', 'string', 'max:500'],
+        ];
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     */
+    private function resolveStage(array $data): LeadStage
+    {
+        $stageId = $data['stage_id'] ?? null;
+        $details = LeadStage::detailsByGroup()[$data['level_group']] ?? [];
+        if ($details && ! $stageId) {
+            throw ValidationException::withMessages([
+                'stage_id' => 'Hãy chọn mức chi tiết của level.',
+            ]);
+        }
+        if ($stageId) {
+            $stage = LeadStage::query()->findOrFail((int) $stageId);
+            if ($stage->level_group !== $data['level_group']) {
+                throw ValidationException::withMessages([
+                    'stage_id' => 'Mức chi tiết không khớp level đã chọn.',
+                ]);
+            }
+
+            return $stage;
+        }
+
+        return LeadStage::query()->where('slug', strtolower((string) $data['level_group']))->firstOrFail();
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     */
+    private function applyContact(Lead $lead, array $data, string $content): void
+    {
+        $incoming = ! empty($data['callback_at'])
+            ? Carbon::parse($data['callback_at'])->format('Y-m-d H:i')
+            : null;
+        $current = $lead->callback_at?->format('Y-m-d H:i');
+        $callbackChanged = $incoming !== $current;
+
+        if ($content === '' && ! $callbackChanged) {
+            return;
+        }
+
+        if (($data['type'] ?? null) === 'call' && $content !== '') {
+            $lead->last_called_at = now();
+        }
+        if ($incoming) {
+            $lead->callback_at = $data['callback_at'];
+            $lead->call_result = 'callback';
+        } elseif ($callbackChanged) {
+            $lead->callback_at = null;
+            if ($lead->call_result === 'callback') {
+                $lead->call_result = 'not_called';
+            }
+        }
+
+        if ($content === '') {
+            return;
+        }
+
+        if ($lead->callback_at) {
+            $content .= ' — hẹn liên hệ lại '.$lead->callback_at->format('d/m/Y H:i');
+        }
+
+        LeadActivity::query()->create([
+            'lead_id' => $lead->id,
+            'user_id' => auth()->id(),
+            'type' => $data['type'],
+            'content' => $content,
+        ]);
     }
 
     /**
